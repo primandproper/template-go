@@ -3,7 +3,7 @@ module github.com/primandproper/template-go
 go 1.26
 
 require (
-	github.com/primandproper/platform-go/v4 v4.0.0
+	github.com/primandproper/platform-go/v4 v4.1.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 )
@@ -14,9 +14,11 @@ require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/trace v1.11.7 // indirect
 	github.com/4meepo/tagalign v1.4.3 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.31.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/alfatraining/structtag v1.0.0 // indirect
+	github.com/caarlos0/env/v11 v11.4.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cockroachdb/errors v1.12.0 // indirect
@@ -44,6 +46,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect

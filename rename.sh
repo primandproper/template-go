@@ -9,8 +9,9 @@ set -euo pipefail
 # It rewrites every reference to this template's module path
 # (github.com/primandproper/template-go) and app identity (the bare "template-go"
 # name and the TEMPLATE_GO_ env-var prefix) with values derived from your new
-# module path, reformats the code, and finally removes this script — leaving no
-# trace that the project started from a template.
+# module path, regenerates the checked-in config files and reformats the code,
+# and finally removes this script — leaving no trace that the project started
+# from a template.
 
 OLD_MODULE="github.com/primandproper/template-go"
 OLD_ORG="github.com/primandproper"
@@ -64,17 +65,21 @@ while IFS= read -r -d '' file; do
 		' "$file"
 	count=$((count + 1))
 done < <(find . -type f \
-	\( -name '*.go' -o -name '*.mod' -o -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name 'Makefile' \) \
+	\( -name '*.go' -o -name '*.mod' -o -name '*.md' -o -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.json' -o -name 'Makefile' \) \
 	-not -path './.git/*' -not -path './artifacts/*' -not -name "$SELF" -print0)
 
 echo "Rewrote references across ${count} files."
 
-# Tidy modules and reformat: when the org prefix changes, platform-go moves import
-# groups, so re-run the formatter. Both are best-effort — the rename already stuck.
+# Tidy modules, regenerate configs, and reformat. The text rewrite above already
+# leaves config/*.json correct; regenerating from the renamed Go source keeps
+# them an authoritative projection when the toolchain is present. When the org
+# prefix changes, platform-go moves import groups, so re-run the formatter too.
+# All best-effort — the rename already stuck.
 if command -v go >/dev/null 2>&1; then
 	go mod tidy || echo "warning: 'go mod tidy' failed; run it manually" >&2
 fi
 if command -v make >/dev/null 2>&1; then
+	make configs >/dev/null || echo "warning: 'make configs' failed; run it manually" >&2
 	make format >/dev/null || echo "warning: 'make format' failed; run it manually" >&2
 fi
 

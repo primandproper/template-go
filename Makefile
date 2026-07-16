@@ -95,6 +95,15 @@ shellcheck:
 .PHONY: lint
 lint: golang_lint shellcheck
 
+## GENERATED FILES
+
+# configs renders the per-environment config files under config/ from their real
+# Go objects (cmd/tools/codegen/configs). Commit the output so the checked-in
+# JSON stays in lockstep with the code.
+.PHONY: configs
+configs:
+	$(SCRIPTS_DIR)/configs.sh $(THIS)
+
 ## EXECUTION
 
 # build compiles every package (fast failure on breakage) and then produces the

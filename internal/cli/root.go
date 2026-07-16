@@ -9,6 +9,7 @@ package cli
 import (
 	"context"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/primandproper/template-go/internal/config"
@@ -18,6 +19,11 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+// ConfigFilePathEnvVar names the environment variable that seeds the --config
+// flag: when it points at a JSON config file, that file is loaded instead of the
+// flag/environment defaults.
+const ConfigFilePathEnvVar = config.EnvVarPrefix + "CONFIG_FILEPATH"
 
 // shutdownTimeout bounds how long we wait for telemetry to flush on exit.
 const shutdownTimeout = 5 * time.Second
@@ -48,6 +54,7 @@ func (a *application) newRootCommand() *cobra.Command {
 	var (
 		logLevel    string
 		serviceName string
+		configPath  string
 	)
 
 	rootCmd := &cobra.Command{
@@ -55,7 +62,7 @@ func (a *application) newRootCommand() *cobra.Command {
 		Short:        "A Go application template built on primandproper/platform-go.",
 		SilenceUsage: true,
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			return a.bootstrap(cmd.Context(), config.Options{ServiceName: serviceName, LogLevel: logLevel})
+			return a.bootstrap(cmd.Context(), config.Options{ServiceName: serviceName, LogLevel: logLevel}, configPath)
 		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			a.log().Info("no subcommand provided; run `template-go help` to see what's available")
@@ -66,6 +73,7 @@ func (a *application) newRootCommand() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", envOr("TEMPLATE_GO_LOG_LEVEL", config.LevelInfo), "log level: debug, info, warn, or error")
 	rootCmd.PersistentFlags().StringVar(&serviceName, "service-name", envOr("TEMPLATE_GO_SERVICE_NAME", config.DefaultServiceName), "service name reported in telemetry")
+	rootCmd.PersistentFlags().StringVar(&configPath, "config", envOr(ConfigFilePathEnvVar, ""), "path to a JSON config file; when set, it is loaded in place of the flag/env defaults")
 
 	rootCmd.AddCommand(a.newVersionCommand())
 
@@ -73,10 +81,21 @@ func (a *application) newRootCommand() *cobra.Command {
 }
 
 // bootstrap assembles configuration and stands up the observability pillars,
-// caching the logger on the application for subcommands to use.
-func (a *application) bootstrap(ctx context.Context, opts config.Options) error {
-	cfg := config.New(opts)
-	if err := cfg.Validate(ctx); err != nil {
+// caching the logger on the application for subcommands to use. When configPath
+// is set it loads that JSON file; otherwise it builds from the flag/env
+// defaults. Either way, environment variables overlay the result.
+func (a *application) bootstrap(ctx context.Context, opts config.Options, configPath string) error {
+	var (
+		cfg *config.Config
+		err error
+	)
+
+	if configPath = strings.TrimSpace(configPath); configPath != "" {
+		cfg, err = config.LoadFromFile(ctx, configPath)
+	} else {
+		cfg, err = config.Load(ctx, opts)
+	}
+	if err != nil {
 		return err
 	}
 

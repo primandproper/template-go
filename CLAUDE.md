@@ -15,9 +15,19 @@ ships a `version` subcommand. Grow it by adding subcommands (e.g. a `serve` comm
 ## Layout
 
 - `cmd/main/main.go` — thin entrypoint: signal-cancellable context → `cli.Execute`.
+- `cmd/tools/codegen/configs/` — codegen tool behind `make configs`: builds each environment's
+  `*config.Config` as a real, typed Go object (`environments.go`), validates it, and renders it to
+  `config/<env>.json` via `config.Render`. The checked-in JSON is a projection of these builders — edit
+  the Go, never the JSON, then re-run `make configs`.
+- `config/` — generated per-environment config files (`localdev.json`, `production.json`); committed so
+  they stay reviewable, and loadable at runtime via `--config`.
 - `internal/cli/` — cobra root command, observability bootstrap + shutdown, subcommands.
 - `internal/config/` — assembles `observability.Config` and builds the pillars (slog logging + noop
   tracing/metrics/profiling by default). See `Config.NewPillars` for the upgrade path to real telemetry.
+  Two loaders use `platform-go/v4/config`: `Load` overlays `TEMPLATE_GO_`-prefixed environment
+  variables on the flag/default-seeded config, and `LoadFromFile` decodes a complete JSON config file
+  and then overlays the same environment variables. `Render` goes the other way: it validates typed
+  `Config` objects and writes them to disk (see `make configs`).
 - `version/` — build metadata (`CommitHash`/`BuildTime`/`CommitTime`), injected via `-ldflags` by
   `scripts/build.sh`.
 
@@ -25,6 +35,7 @@ ships a `version` subcommand. Grow it by adding subcommands (e.g. a `serve` comm
 
 ```bash
 make setup          # Create artifacts dir + download the module cache
+make configs        # Render config/<env>.json from the real Go objects in cmd/tools/codegen/configs
 make build          # Compile all packages, then build artifacts/template-go with version metadata
 make run ARGS="version"   # go run the CLI with arguments
 make format         # Format all Go code (imports, field alignment, tag alignment, gofmt)
@@ -68,7 +79,13 @@ because `format_imports.sh` runs `dirname` on it to derive the org-level prefix.
 - Observability logs are structured slog written to **stdout**. `version` prints its data to stdout
   and emits nothing at the default `info` level, so `template-go version` stays machine-parseable.
 - The `--log-level` / `--service-name` persistent flags default from the `TEMPLATE_GO_LOG_LEVEL` and
-  `TEMPLATE_GO_SERVICE_NAME` environment variables.
+  `TEMPLATE_GO_SERVICE_NAME` environment variables. The `--config` flag (default from
+  `TEMPLATE_GO_CONFIG_FILEPATH`) points at a JSON config file; when set, `bootstrap` loads it via
+  `config.LoadFromFile` instead of the flag/env defaults.
+- Configuration is layered: defaults (or a JSON file) < `TEMPLATE_GO_`-prefixed environment variables.
+  Env vars follow platform-go's nested `envPrefix` tags, e.g.
+  `TEMPLATE_GO_OBSERVABILITY_LOGGING_LEVEL`. Give new `Config` fields both `envPrefix`/`env` and `json`
+  tags so they participate in `Load` and `LoadFromFile`.
 - To enable real tracing/metrics/profiling, populate the sub-configs in `internal/config` and call
   `observability.Config.NewPillars`, or swap the noop constructors in `Config.NewPillars`.
 
