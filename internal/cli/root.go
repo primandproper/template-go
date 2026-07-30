@@ -14,8 +14,8 @@ import (
 
 	"github.com/primandproper/template-go/internal/config"
 
-	"github.com/primandproper/platform-go/v7/observability"
-	"github.com/primandproper/platform-go/v7/observability/logging"
+	"github.com/primandproper/platform-go/v8/observability"
+	"github.com/primandproper/platform-go/v8/observability/logging"
 
 	"github.com/spf13/cobra"
 )

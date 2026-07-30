@@ -3,7 +3,7 @@ module github.com/primandproper/template-go
 go 1.26
 
 require (
-	github.com/primandproper/platform-go/v7 v7.1.1
+	github.com/primandproper/platform-go/v8 v8.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 )
