@@ -24,7 +24,7 @@ ships a `version` subcommand. Grow it by adding subcommands (e.g. a `serve` comm
 - `internal/cli/` — cobra root command, observability bootstrap + shutdown, subcommands.
 - `internal/config/` — assembles `observability.Config` and builds the pillars (slog logging + noop
   tracing/metrics/profiling by default). See `Config.NewPillars` for the upgrade path to real telemetry.
-  Two loaders use `platform-go/v7/config`: `Load` overlays `TEMPLATE_GO_`-prefixed environment
+  Two loaders use `platform-go/v10/config`: `Load` overlays `TEMPLATE_GO_`-prefixed environment
   variables on the flag/default-seeded config, and `LoadFromFile` decodes a complete JSON config file
   and then overlays the same environment variables. `Render` goes the other way: it validates typed
   `Config` objects and writes them to disk (see `make configs`).

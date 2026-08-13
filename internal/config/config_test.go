@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/primandproper/platform-go/v7/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v7/observability/logging/config"
+	"github.com/primandproper/platform-go/v10/observability/logging"
+	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +23,7 @@ func TestNew(t *testing.T) {
 
 		assert.Equal(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
 		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.True(t, logging.LevelsEqual(logging.InfoLevel, cfg.Observability.Logging.Level))
+		assert.Equal(t, logging.InfoLevel, cfg.Observability.Logging.Level)
 
 		require.NoError(t, cfg.Validate(context.Background()))
 
@@ -39,7 +39,7 @@ func TestNew(t *testing.T) {
 		cfg := New(Options{ServiceName: "custom", LogLevel: "debug"})
 
 		assert.Equal(t, "custom", cfg.Observability.Logging.ServiceName)
-		assert.True(t, logging.LevelsEqual(logging.DebugLevel, cfg.Observability.Logging.Level))
+		assert.Equal(t, logging.DebugLevel, cfg.Observability.Logging.Level)
 		require.NoError(t, cfg.Validate(context.Background()))
 	})
 }
@@ -54,7 +54,7 @@ func TestLoad(t *testing.T) {
 
 		assert.Equal(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
 		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.True(t, logging.LevelsEqual(logging.InfoLevel, cfg.Observability.Logging.Level))
+		assert.Equal(t, logging.InfoLevel, cfg.Observability.Logging.Level)
 	})
 
 	t.Run("environment variables overlay the option defaults", func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestLoad(t *testing.T) {
 
 		// The env var wins over the option-seeded default.
 		assert.Equal(t, "from-env", cfg.Observability.Logging.ServiceName)
-		assert.True(t, logging.LevelsEqual(logging.ErrorLevel, cfg.Observability.Logging.Level))
+		assert.Equal(t, logging.ErrorLevel, cfg.Observability.Logging.Level)
 		// A field with no env var keeps the default set by New.
 		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
 	})
@@ -84,7 +84,7 @@ func TestLoadFromFile(t *testing.T) {
 
 		assert.Equal(t, "from-file", cfg.Observability.Logging.ServiceName)
 		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.True(t, logging.LevelsEqual(logging.WarnLevel, cfg.Observability.Logging.Level))
+		assert.Equal(t, logging.WarnLevel, cfg.Observability.Logging.Level)
 	})
 
 	t.Run("environment variables overlay the file", func(t *testing.T) {
@@ -101,14 +101,28 @@ func TestLoadFromFile(t *testing.T) {
 		assert.Equal(t, "env-wins", cfg.Observability.Logging.ServiceName)
 	})
 
-	t.Run("an incomplete file fails validation", func(t *testing.T) {
+	t.Run("an invalid file fails validation", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "config.json")
+		require.NoError(t, os.WriteFile(path, []byte(
+			`{"observability":{"logging":{"provider":"nonsense"}}}`,
+		), 0o600))
+
+		_, err := LoadFromFile(context.Background(), path)
+		require.Error(t, err)
+	})
+
+	t.Run("a file omitting the service name is valid for a stdout provider", func(t *testing.T) {
+		// The platform requires a service name only for the providers that ship
+		// telemetry somewhere (otelslog); slog writes to stdout, so a file that
+		// omits it loads cleanly.
 		path := filepath.Join(t.TempDir(), "config.json")
 		require.NoError(t, os.WriteFile(path, []byte(
 			`{"observability":{"logging":{"provider":"slog"}}}`,
 		), 0o600))
 
-		_, err := LoadFromFile(context.Background(), path)
-		require.Error(t, err)
+		cfg, err := LoadFromFile(context.Background(), path)
+		require.NoError(t, err)
+		assert.Empty(t, cfg.Observability.Logging.ServiceName)
 	})
 
 	t.Run("a missing file is an error", func(t *testing.T) {
@@ -133,6 +147,6 @@ func TestLevelFromString(t *testing.T) {
 	}
 
 	for input, want := range cases {
-		assert.Truef(t, logging.LevelsEqual(want, levelFromString(input)), "input %q", input)
+		assert.Equalf(t, want, levelFromString(input), "input %q", input)
 	}
 }

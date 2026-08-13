@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/primandproper/platform-go/v7/observability"
-	"github.com/primandproper/platform-go/v7/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v7/observability/logging/config"
+	"github.com/primandproper/platform-go/v10/observability"
+	"github.com/primandproper/platform-go/v10/observability/logging"
+	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,8 +68,14 @@ func TestRender(t *testing.T) {
 		t.Parallel()
 
 		path := filepath.Join(t.TempDir(), "config.json")
-		// Missing logging service name fails validation.
-		env := []Environment{{Name: "broken", Path: path, Config: &Config{}}}
+		// An unrecognized logging provider fails validation. (A zero Config does
+		// not: the empty provider is the documented opt-out into noop logging.)
+		broken := &Config{
+			Observability: observability.Config{
+				Logging: loggingcfg.Config{Provider: "nonsense"},
+			},
+		}
+		env := []Environment{{Name: "broken", Path: path, Config: broken}}
 
 		require.Error(t, Render(context.Background(), env, true))
 

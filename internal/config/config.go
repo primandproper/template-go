@@ -26,13 +26,13 @@ import (
 	"log/slog"
 	"strings"
 
-	platformconfig "github.com/primandproper/platform-go/v7/config"
-	"github.com/primandproper/platform-go/v7/observability"
-	"github.com/primandproper/platform-go/v7/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v7/observability/logging/config"
-	metricsnoop "github.com/primandproper/platform-go/v7/observability/metrics/noop"
-	profilingnoop "github.com/primandproper/platform-go/v7/observability/profiling/noop"
-	tracingnoop "github.com/primandproper/platform-go/v7/observability/tracing/noop"
+	platformconfig "github.com/primandproper/platform-go/v10/config"
+	"github.com/primandproper/platform-go/v10/observability"
+	"github.com/primandproper/platform-go/v10/observability/logging"
+	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
+	metricsnoop "github.com/primandproper/platform-go/v10/observability/metrics/noop"
+	profilingnoop "github.com/primandproper/platform-go/v10/observability/profiling/noop"
+	tracingnoop "github.com/primandproper/platform-go/v10/observability/tracing/noop"
 )
 
 // DefaultServiceName is the service name reported by the observability suite
@@ -137,11 +137,14 @@ func Load(ctx context.Context, opts Options) (*Config, error) {
 // LoadFromFile decodes a complete JSON configuration file and then overlays
 // environment variables (a set TEMPLATE_GO_ variable wins over the file value).
 // Unlike Load, it does not start from the built-in defaults: the file is
-// expected to fully specify the config — at minimum a logging service name — so
-// use it once a deployment has a real config file to mount. The result is
-// validated before it is returned.
+// expected to fully specify the config, so use it once a deployment has a real
+// config file to mount. The result is validated before it is returned. Note
+// that validation is permissive about omissions — an empty logging provider is
+// the documented opt-out into noop logging, and a service name is required only
+// by the providers that export telemetry — so a sparse file loads rather than
+// failing, and takes the zero value for whatever it leaves out.
 func LoadFromFile(ctx context.Context, path string) (*Config, error) {
-	cfg, err := platformconfig.LoadFromJSONFile[Config](path, envVarOptions()...)
+	cfg, err := platformconfig.LoadFromJSONFile[Config](ctx, path, envVarOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("loading configuration file: %w", err)
 	}
