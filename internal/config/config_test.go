@@ -9,8 +9,8 @@ import (
 	"github.com/primandproper/platform-go/v10/observability/logging"
 	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/shoenig/test"
+	"github.com/shoenig/test/must"
 )
 
 func TestNew(t *testing.T) {
@@ -21,16 +21,16 @@ func TestNew(t *testing.T) {
 
 		cfg := New(Options{})
 
-		assert.Equal(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
-		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.Equal(t, logging.InfoLevel, cfg.Observability.Logging.Level)
+		test.Eq(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
+		test.Eq(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
+		test.Eq(t, logging.InfoLevel, cfg.Observability.Logging.Level)
 
-		require.NoError(t, cfg.Validate(context.Background()))
+		must.NoError(t, cfg.Validate(context.Background()))
 
 		pillars, err := cfg.Observability.NewPillars(context.Background())
-		require.NoError(t, err)
-		require.NotNil(t, pillars)
-		require.NotNil(t, pillars.Logger)
+		must.NoError(t, err)
+		must.NotNil(t, pillars)
+		must.NotNil(t, pillars.Logger)
 	})
 
 	t.Run("options override defaults", func(t *testing.T) {
@@ -38,9 +38,9 @@ func TestNew(t *testing.T) {
 
 		cfg := New(Options{ServiceName: "custom", LogLevel: "debug"})
 
-		assert.Equal(t, "custom", cfg.Observability.Logging.ServiceName)
-		assert.Equal(t, logging.DebugLevel, cfg.Observability.Logging.Level)
-		require.NoError(t, cfg.Validate(context.Background()))
+		test.Eq(t, "custom", cfg.Observability.Logging.ServiceName)
+		test.Eq(t, logging.DebugLevel, cfg.Observability.Logging.Level)
+		must.NoError(t, cfg.Validate(context.Background()))
 	})
 }
 
@@ -50,11 +50,11 @@ func TestNew(t *testing.T) {
 func TestLoad(t *testing.T) {
 	t.Run("defaults when no environment variables are set", func(t *testing.T) {
 		cfg, err := Load(context.Background(), Options{})
-		require.NoError(t, err)
+		must.NoError(t, err)
 
-		assert.Equal(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
-		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.Equal(t, logging.InfoLevel, cfg.Observability.Logging.Level)
+		test.Eq(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
+		test.Eq(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
+		test.Eq(t, logging.InfoLevel, cfg.Observability.Logging.Level)
 	})
 
 	t.Run("environment variables overlay the option defaults", func(t *testing.T) {
@@ -62,53 +62,53 @@ func TestLoad(t *testing.T) {
 		t.Setenv(EnvVarPrefix+"OBSERVABILITY_LOGGING_LEVEL", "error")
 
 		cfg, err := Load(context.Background(), Options{ServiceName: "from-opts", LogLevel: "info"})
-		require.NoError(t, err)
+		must.NoError(t, err)
 
 		// The env var wins over the option-seeded default.
-		assert.Equal(t, "from-env", cfg.Observability.Logging.ServiceName)
-		assert.Equal(t, logging.ErrorLevel, cfg.Observability.Logging.Level)
+		test.Eq(t, "from-env", cfg.Observability.Logging.ServiceName)
+		test.Eq(t, logging.ErrorLevel, cfg.Observability.Logging.Level)
 		// A field with no env var keeps the default set by New.
-		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
+		test.Eq(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
 	})
 }
 
 func TestLoadFromFile(t *testing.T) {
 	t.Run("decodes a complete config file", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
-		require.NoError(t, os.WriteFile(path, []byte(
+		must.NoError(t, os.WriteFile(path, []byte(
 			`{"observability":{"logging":{"provider":"slog","serviceName":"from-file","level":"warn"}}}`,
 		), 0o600))
 
 		cfg, err := LoadFromFile(context.Background(), path)
-		require.NoError(t, err)
+		must.NoError(t, err)
 
-		assert.Equal(t, "from-file", cfg.Observability.Logging.ServiceName)
-		assert.Equal(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
-		assert.Equal(t, logging.WarnLevel, cfg.Observability.Logging.Level)
+		test.Eq(t, "from-file", cfg.Observability.Logging.ServiceName)
+		test.Eq(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
+		test.Eq(t, logging.WarnLevel, cfg.Observability.Logging.Level)
 	})
 
 	t.Run("environment variables overlay the file", func(t *testing.T) {
 		t.Setenv(EnvVarPrefix+"OBSERVABILITY_LOGGING_SERVICE_NAME", "env-wins")
 
 		path := filepath.Join(t.TempDir(), "config.json")
-		require.NoError(t, os.WriteFile(path, []byte(
+		must.NoError(t, os.WriteFile(path, []byte(
 			`{"observability":{"logging":{"provider":"slog","serviceName":"from-file"}}}`,
 		), 0o600))
 
 		cfg, err := LoadFromFile(context.Background(), path)
-		require.NoError(t, err)
+		must.NoError(t, err)
 
-		assert.Equal(t, "env-wins", cfg.Observability.Logging.ServiceName)
+		test.Eq(t, "env-wins", cfg.Observability.Logging.ServiceName)
 	})
 
 	t.Run("an invalid file fails validation", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
-		require.NoError(t, os.WriteFile(path, []byte(
+		must.NoError(t, os.WriteFile(path, []byte(
 			`{"observability":{"logging":{"provider":"nonsense"}}}`,
 		), 0o600))
 
 		_, err := LoadFromFile(context.Background(), path)
-		require.Error(t, err)
+		must.Error(t, err)
 	})
 
 	t.Run("a file omitting the service name is valid for a stdout provider", func(t *testing.T) {
@@ -116,18 +116,18 @@ func TestLoadFromFile(t *testing.T) {
 		// telemetry somewhere (otelslog); slog writes to stdout, so a file that
 		// omits it loads cleanly.
 		path := filepath.Join(t.TempDir(), "config.json")
-		require.NoError(t, os.WriteFile(path, []byte(
+		must.NoError(t, os.WriteFile(path, []byte(
 			`{"observability":{"logging":{"provider":"slog"}}}`,
 		), 0o600))
 
 		cfg, err := LoadFromFile(context.Background(), path)
-		require.NoError(t, err)
-		assert.Empty(t, cfg.Observability.Logging.ServiceName)
+		must.NoError(t, err)
+		test.Eq(t, "", cfg.Observability.Logging.ServiceName)
 	})
 
 	t.Run("a missing file is an error", func(t *testing.T) {
 		_, err := LoadFromFile(context.Background(), filepath.Join(t.TempDir(), "does-not-exist.json"))
-		require.Error(t, err)
+		must.Error(t, err)
 	})
 }
 
@@ -147,6 +147,6 @@ func TestLevelFromString(t *testing.T) {
 	}
 
 	for input, want := range cases {
-		assert.Equalf(t, want, levelFromString(input), "input %q", input)
+		test.Eq(t, want, levelFromString(input), test.Sprintf("input %q", input))
 	}
 }
