@@ -10,8 +10,8 @@ import (
 	"github.com/primandproper/platform-go/v10/observability/logging"
 	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/shoenig/test"
+	"github.com/shoenig/test/must"
 )
 
 func validConfig(serviceName string) *Config {
@@ -38,12 +38,12 @@ func TestRender(t *testing.T) {
 			{Name: "production", Path: filepath.Join(dir, "nested", "production.json"), Config: validConfig("prod-service")},
 		}
 
-		require.NoError(t, Render(context.Background(), envs, true))
+		must.NoError(t, Render(context.Background(), envs, true))
 
 		for _, env := range envs {
 			loaded, err := LoadFromFile(context.Background(), env.Path)
-			require.NoErrorf(t, err, "loading %s", env.Name)
-			assert.Equal(t, env.Config.Observability.Logging.ServiceName, loaded.Observability.Logging.ServiceName)
+			must.NoError(t, err, must.Sprintf("loading %s", env.Name))
+			test.Eq(t, env.Config.Observability.Logging.ServiceName, loaded.Observability.Logging.ServiceName)
 		}
 	})
 
@@ -53,15 +53,15 @@ func TestRender(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "config.json")
 		env := []Environment{{Name: "localdev", Path: path, Config: validConfig("svc")}}
 
-		require.NoError(t, Render(context.Background(), env, true))
+		must.NoError(t, Render(context.Background(), env, true))
 		first, err := os.ReadFile(path)
-		require.NoError(t, err)
+		must.NoError(t, err)
 
-		require.NoError(t, Render(context.Background(), env, true))
+		must.NoError(t, Render(context.Background(), env, true))
 		second, err := os.ReadFile(path)
-		require.NoError(t, err)
+		must.NoError(t, err)
 
-		assert.Equal(t, first, second)
+		test.Eq(t, first, second)
 	})
 
 	t.Run("validation rejects an invalid config before writing", func(t *testing.T) {
@@ -77,9 +77,8 @@ func TestRender(t *testing.T) {
 		}
 		env := []Environment{{Name: "broken", Path: path, Config: broken}}
 
-		require.Error(t, Render(context.Background(), env, true))
+		must.Error(t, Render(context.Background(), env, true))
 
-		_, err := os.Stat(path)
-		assert.Truef(t, os.IsNotExist(err), "no file should be written for an invalid config")
+		test.FileNotExists(t, path)
 	})
 }

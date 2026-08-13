@@ -69,7 +69,9 @@ because `format_imports.sh` runs `dirname` on it to derive the org-level prefix.
 
 ## Testing
 
-- Tests use `stretchr/testify` (assert, require).
+- Tests use `shoenig/test`: `test` for non-fatal assertions, `must` for fatal ones. Both take
+  `(t, expected, actual)` and annotate failures via `test.Sprintf` / `must.Sprintf` settings rather
+  than `...f` variants.
 - Tests call `t.Parallel()` by default.
 - `make test` excludes `cmd` packages, so keep testable logic in `internal/` and `version/`.
 - Test command: `CGO_ENABLED=1 go test -shuffle=on -race -vet=all -failfast`.
