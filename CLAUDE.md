@@ -55,6 +55,20 @@ This template does **not** vendor dependencies (platform-go's dependency tree is
 tests run against the module cache. Vendoring targets (`make vendor` / `make revendor`) exist for
 consumers who want them.
 
+`scripts/go_files.sh` is the one place that decides which Go files the formatters see, and
+`format_golang.sh`, `format_imports.sh`, `goimports.sh`, and the `gofmt` check in
+`.github/workflows/formatting.yaml` all take their list from it. It asks the Go toolchain
+(`go list -e -f '{{.Dir}}' ./...`, then `find -maxdepth 1`) rather than writing out an exclusion
+list, so `vendor/`, `testdata/`, and any `_`- or `.`-prefixed directory are skipped for the same
+reason `go test ./...` skips them. Point new filesystem-walking tooling at it rather than adding a
+fourth spelling of the same exclusion.
+
+Two things about it are load-bearing. It **fails loudly rather than emitting an empty list** — an
+out-of-sync `vendor/modules.txt` makes `go list` exit non-zero, and a formatter that quietly formats
+nothing (or a CI check that quietly checks nothing) is worse than a stop. And its callers read it
+**through a file, not `< <(...)`**, because process substitution discards the exit status of what it
+runs, which is exactly how that empty list would go unnoticed.
+
 ## Import Ordering
 
 Import ordering uses `gci` with four sections, separated by blank lines:

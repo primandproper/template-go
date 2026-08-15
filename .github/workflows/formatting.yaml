@@ -27,5 +27,22 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
 
+      # `gofmt -l` walks the filesystem rather than Go's package wildcard, so
+      # unlike `go vet ./...` it has to be told which files are the module's own.
+      # scripts/go_files.sh is the one place that answers, here and locally, by
+      # asking the toolchain — which is what keeps vendor/ and testdata/ out.
+      #
+      # pipefail matters more than usual: without it, go_files.sh failing
+      # mid-pipeline is masked by xargs exiting 0 on no input, and the step
+      # passes having checked nothing at all.
       - name: check formatting
-        run: if [ $(gofmt -l . | grep -Ev '^vendor\/' | head -c1 | wc -c) -ne 0 ]; then exit 1; fi
+        run: |
+          set -euo pipefail
+
+          unformatted=$(scripts/go_files.sh . | xargs -0 gofmt -l)
+
+          if [ -n "${unformatted}" ]; then
+            echo "::error::gofmt reports these files as unformatted:"
+            echo "${unformatted}"
+            exit 1
+          fi
