@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/primandproper/template-go/internal/config"
 
-	"github.com/primandproper/platform-go/v10/observability"
-	"github.com/primandproper/platform-go/v10/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v10/observability/logging/config"
+	"github.com/primandproper/platform-go/v11/observability"
+	"github.com/primandproper/platform-go/v11/observability/logging"
+	loggingcfg "github.com/primandproper/platform-go/v11/observability/logging/config"
 )
 
 // Each builder returns a fully-formed *config.Config for one environment. The
