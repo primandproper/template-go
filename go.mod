@@ -3,7 +3,7 @@ module github.com/primandproper/template-go
 go 1.26
 
 require (
-	github.com/primandproper/platform-go/v10 v10.0.0
+	github.com/primandproper/platform-go/v11 v11.2.0
 	github.com/shoenig/test v1.13.2
 	github.com/spf13/cobra v1.10.2
 )
@@ -27,7 +27,7 @@ require (
 	github.com/daixiang0/gci v0.14.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/getsentry/sentry-go v0.43.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -65,6 +65,8 @@ require (
 	github.com/samber/slog-multi v1.7.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/swaggest/jsonschema-go v0.3.79 // indirect
+	github.com/swaggest/refl v1.4.0 // indirect
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
