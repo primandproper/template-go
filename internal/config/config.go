@@ -1,13 +1,14 @@
 // Package config assembles the application's configuration, most notably the
-// observability settings that the platform-go observability suite consumes.
+// observability settings that the primitives-go observability suite consumes.
 //
 // The configuration is built in Go with sensible, zero-dependency defaults so
-// the binary boots out of the box: structured slog logging plus noop tracing,
-// metrics, and profiling. Callers may override the service name and log level
-// (see Options), which is how the CLI threads its flags and environment into
-// the platform configuration.
+// the binary boots out of the box: structured slog logging, and tracing,
+// metrics and profiling left unconfigured, which primitives-go resolves to noop
+// providers. Callers may override the service name and log level (see Options),
+// which is how the CLI threads its flags and environment into the platform
+// configuration.
 //
-// Two loaders build on those defaults using platform-go's config package:
+// Two loaders build on those defaults using primitives-go's config package:
 //
 //   - Load overlays environment variables (prefixed with EnvVarPrefix) on top of
 //     the defaults, so any field can be tuned without a config file — the
@@ -18,6 +19,10 @@
 //
 // Both share envVarOptions, which wires the app's env var prefix and a debug
 // hook that logs every value the parser applies.
+//
+// The set of variables that overlay can read is not written down here. It is
+// derived from the `env:` tags reachable from the configurations constraint and
+// generated into the envvars subpackage by `make envvars`.
 package config
 
 import (
@@ -26,13 +31,13 @@ import (
 	"log/slog"
 	"strings"
 
-	platformconfig "github.com/primandproper/platform-go/v11/config"
-	"github.com/primandproper/platform-go/v11/observability"
-	"github.com/primandproper/platform-go/v11/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v11/observability/logging/config"
-	metricsnoop "github.com/primandproper/platform-go/v11/observability/metrics/noop"
-	profilingnoop "github.com/primandproper/platform-go/v11/observability/profiling/noop"
-	tracingnoop "github.com/primandproper/platform-go/v11/observability/tracing/noop"
+	primitivesconfig "github.com/primandproper/primitives-go/v2/config"
+	"github.com/primandproper/primitives-go/v2/observability"
+	"github.com/primandproper/primitives-go/v2/observability/logging"
+	loggingcfg "github.com/primandproper/primitives-go/v2/observability/logging/config"
+	metricsnoop "github.com/primandproper/primitives-go/v2/observability/metrics/noop"
+	profilingnoop "github.com/primandproper/primitives-go/v2/observability/profiling/noop"
+	tracingnoop "github.com/primandproper/primitives-go/v2/observability/tracing/noop"
 )
 
 // DefaultServiceName is the service name reported by the observability suite
@@ -53,10 +58,22 @@ const (
 	LevelError = "error"
 )
 
-// Config is the application configuration. It wraps the platform-go
+// configurations is the constraint every loadable configuration struct in this
+// package is a member of. Today that is Config alone; a second one — a worker
+// or a migration tool with its own shape — joins it here.
+//
+// It is what makes `make envvars` complete by construction. The generator walks
+// this constraint's members rather than a list somebody remembered to update,
+// so a configuration struct cannot become loadable without its environment
+// variables appearing in the generated envvars package.
+type configurations interface {
+	Config
+}
+
+// Config is the application configuration. It wraps the primitives-go
 // observability configuration; add your own fields here as the application grows.
 //
-// The struct tags let platform-go's config package populate the config from
+// The struct tags let primitives-go's config package populate the config from
 // environment variables (envPrefix) and JSON files (json). Give new fields both
 // tags so they participate in Load and LoadFromFile.
 type Config struct {
@@ -88,9 +105,9 @@ func New(opts Options) *Config {
 				ServiceName: serviceName,
 				Level:       levelFromString(opts.LogLevel),
 			},
-			// Tracing, Metrics, and Profiling are left at their zero values,
-			// which the platform resolves to noop providers. Enable them by
-			// populating the corresponding sub-config.
+			// Tracing, Metrics, and Profiling are left at their zero values.
+			// An empty provider is the documented opt-out into a noop, so the
+			// binary stays quiet and dependency-free until one is named.
 		},
 	}
 
@@ -101,10 +118,10 @@ func New(opts Options) *Config {
 // this package: the application's env var prefix and a debug hook that logs each
 // value the parser applies. Because the hook uses the standard-library slog
 // default logger, these lines appear only when that logger is at debug level.
-func envVarOptions() []platformconfig.Option {
-	return []platformconfig.Option{
-		platformconfig.WithPrefix(EnvVarPrefix),
-		platformconfig.WithOnSet(func(tag string, value any, isDefault bool) {
+func envVarOptions() []primitivesconfig.Option {
+	return []primitivesconfig.Option{
+		primitivesconfig.WithPrefix(EnvVarPrefix),
+		primitivesconfig.WithOnSet(func(tag string, value any, isDefault bool) {
 			slog.Debug("config value set from environment",
 				slog.String("tag", tag),
 				slog.Any("value", value),
@@ -123,7 +140,7 @@ func envVarOptions() []platformconfig.Option {
 func Load(ctx context.Context, opts Options) (*Config, error) {
 	cfg := New(opts)
 
-	if err := platformconfig.ApplyEnvironmentVariables(cfg, envVarOptions()...); err != nil {
+	if err := primitivesconfig.ApplyEnvironmentVariables(cfg, envVarOptions()...); err != nil {
 		return nil, fmt.Errorf("applying environment variables: %w", err)
 	}
 
@@ -144,13 +161,26 @@ func Load(ctx context.Context, opts Options) (*Config, error) {
 // by the providers that export telemetry — so a sparse file loads rather than
 // failing, and takes the zero value for whatever it leaves out.
 func LoadFromFile(ctx context.Context, path string) (*Config, error) {
-	cfg, err := platformconfig.LoadFromJSONFile[Config](ctx, path, envVarOptions()...)
+	cfg, err := loadFromJSONFile[Config](ctx, path)
 	if err != nil {
-		return nil, fmt.Errorf("loading configuration file: %w", err)
+		return nil, err
 	}
 
 	if err = cfg.Validate(ctx); err != nil {
 		return nil, fmt.Errorf("validating configuration: %w", err)
+	}
+
+	return cfg, nil
+}
+
+// loadFromJSONFile is the decode every loadable configuration struct goes
+// through, and the reason the configurations constraint has teeth: a struct
+// this package cannot load through here is a struct whose environment variables
+// `make envvars` would not have generated.
+func loadFromJSONFile[T configurations](ctx context.Context, path string) (*T, error) {
+	cfg, err := primitivesconfig.LoadFromJSONFile[T](ctx, path, envVarOptions()...)
+	if err != nil {
+		return nil, fmt.Errorf("loading configuration file: %w", err)
 	}
 
 	return cfg, nil
@@ -163,16 +193,27 @@ func (c *Config) Validate(ctx context.Context) error {
 
 // NewPillars builds the observability pillars for the application.
 //
-// Logging is configured from Config (structured slog by default), while
-// tracing, metrics, and profiling default to noop providers so the binary stays
-// quiet and dependency-free out of the box. To enable real telemetry, populate
-// the Tracing/Metrics/Profiling sub-configs of c.Observability and call
-// c.Observability.NewPillars(ctx) instead — it wires OTel/Cloud providers from
-// the same config — or replace the noop constructors below with your own.
+// Turning on real telemetry is a config change rather than an edit here: name a
+// provider in the JSON or in a TEMPLATE_GO_OBSERVABILITY_*_PROVIDER variable and
+// the aggregate constructor wires it, exporters and all.
+//
+// The unconfigured case is built here instead, and the reason is narrower than
+// it looks. observability.Config.NewPillars resolves a pillar naming no provider
+// to that pillar's noop, which is the same result — but the tracing sub-config
+// announces the decision with an unconditional INFO line on its way there, and
+// its two siblings do not. Structured logs go to stdout, which is where the
+// version subcommand's output goes too, so delegating unconditionally would put
+// a log line in front of every `template-go version` at the default level and
+// cost the template the machine-parseable output it promises. There is no
+// setting that silences it; building the three noops directly is what does.
 func (c *Config) NewPillars(ctx context.Context) (*observability.Pillars, error) {
-	logger, err := c.Observability.Logging.NewLogger(ctx)
+	if c.telemetryConfigured() {
+		return c.Observability.NewPillars(ctx)
+	}
+
+	logger, err := loggingcfg.NewLogger(ctx, &c.Observability.Logging)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("setting up logger: %w", err)
 	}
 
 	return &observability.Pillars{
@@ -181,6 +222,15 @@ func (c *Config) NewPillars(ctx context.Context) (*observability.Pillars, error)
 		MetricsProvider: metricsnoop.NewMetricsProvider(),
 		Profiler:        profilingnoop.NewProvider(),
 	}, nil
+}
+
+// telemetryConfigured reports whether any of the three exporting pillars names a
+// provider. Naming one — including "noop" — is a deliberate choice, so it is
+// answered by the aggregate constructor and whatever that has to say about it.
+func (c *Config) telemetryConfigured() bool {
+	return c.Observability.Tracing.Provider != "" ||
+		c.Observability.Metrics.Provider != "" ||
+		c.Observability.Profiling.Provider != ""
 }
 
 // levelFromString maps a human-friendly level name onto a platform log level,

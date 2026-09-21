@@ -1,9 +1,9 @@
 module github.com/primandproper/template-go
 
-go 1.26
+go 1.27
 
 require (
-	github.com/primandproper/platform-go/v11 v11.2.0
+	github.com/primandproper/primitives-go/v2 v2.5.0
 	github.com/shoenig/test v1.13.2
 	github.com/spf13/cobra v1.10.2
 )
@@ -24,6 +24,7 @@ require (
 	github.com/cockroachdb/errors v1.12.0 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20241215232642-bb51bb14a506 // indirect
 	github.com/cockroachdb/redact v1.1.8 // indirect
+	github.com/codemodus/kace v0.5.1 // indirect
 	github.com/daixiang0/gci v0.14.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect

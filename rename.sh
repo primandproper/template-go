@@ -49,7 +49,7 @@ echo "  env prefix  : ${OLD_ENV_PREFIX} -> ${NEW_ENV_PREFIX}"
 # Rewrite every text file that can carry a reference. find -print0 is portable
 # (macOS/Linux), unlike grep -Z. Each perl substitution is ordered so the full
 # module path is rewritten before the bare app name, and the org-prefix change is
-# scoped to the gci config line — leaving platform-go's github.com/primandproper
+# scoped to the gci config line — leaving primitives-go's github.com/primandproper
 # imports untouched. perl no-ops on files without a match.
 count=0
 while IFS= read -r -d '' file; do
@@ -70,16 +70,17 @@ done < <(find . -type f \
 
 echo "Rewrote references across ${count} files."
 
-# Tidy modules, regenerate configs, and reformat. The text rewrite above already
-# leaves config/*.json correct; regenerating from the renamed Go source keeps
-# them an authoritative projection when the toolchain is present. When the org
-# prefix changes, platform-go moves import groups, so re-run the formatter too.
-# All best-effort — the rename already stuck.
+# Tidy modules, regenerate the generated files, and reformat. The text rewrite
+# above already leaves config/*.json and the envvars constants correct;
+# regenerating from the renamed Go source keeps them authoritative projections
+# when the toolchain is present. When the org prefix changes, primitives-go moves
+# import groups, so re-run the formatter too. All best-effort — the rename
+# already stuck.
 if command -v go >/dev/null 2>&1; then
 	go mod tidy || echo "warning: 'go mod tidy' failed; run it manually" >&2
 fi
 if command -v make >/dev/null 2>&1; then
-	make configs >/dev/null || echo "warning: 'make configs' failed; run it manually" >&2
+	make generated >/dev/null || echo "warning: 'make generated' failed; run it manually" >&2
 	make format >/dev/null || echo "warning: 'make format' failed; run it manually" >&2
 fi
 
