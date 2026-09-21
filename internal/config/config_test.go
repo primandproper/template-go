@@ -2,12 +2,14 @@ package config
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/primandproper/platform-go/v11/observability/logging"
-	loggingcfg "github.com/primandproper/platform-go/v11/observability/logging/config"
+	"github.com/primandproper/primitives-go/v2/observability/logging"
+	loggingcfg "github.com/primandproper/primitives-go/v2/observability/logging/config"
+	tracingcfg "github.com/primandproper/primitives-go/v2/observability/tracing/config"
 
 	"github.com/shoenig/test"
 	"github.com/shoenig/test/must"
@@ -149,4 +151,80 @@ func TestLevelFromString(t *testing.T) {
 	for input, want := range cases {
 		test.Eq(t, want, levelFromString(input), test.Sprintf("input %q", input))
 	}
+}
+
+// TestCheckedInConfigsLoad is the guard on `make configs`. The files under
+// config/ are a projection of the Go objects in cmd/tools/codegen/configs, and
+// nothing at build time re-derives them — so a Config field that was renamed or
+// tightened without a regenerate leaves a checked-in file that no longer loads.
+// This is where that shows up.
+func TestCheckedInConfigsLoad(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"localdev", "production"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, err := LoadFromFile(t.Context(), filepath.Join("..", "..", "config", name+".json"))
+			must.NoError(t, err)
+			test.Eq(t, DefaultServiceName, cfg.Observability.Logging.ServiceName)
+			test.Eq(t, loggingcfg.ProviderSlog, cfg.Observability.Logging.Provider)
+		})
+	}
+}
+
+// TestNewPillarsIsQuietWhenUnconfigured pins the contract the version
+// subcommand depends on: at the default info level a config that names no
+// telemetry provider must produce no output at all, because the slog provider
+// writes to stdout and that is where `template-go version` prints too.
+//
+// The aggregate observability constructor does not have this property — the
+// tracing sub-config announces "tracing disabled" on its way to the noop — so
+// this is what stops a future simplification from delegating to it
+// unconditionally.
+//
+// It replaces os.Stdout for the length of the call, which is process-wide
+// state, so it does not call t.Parallel. The slog logger captures the file at
+// construction rather than reading it per write, so the swap has to be in place
+// before NewPillars runs.
+func TestNewPillarsIsQuietWhenUnconfigured(t *testing.T) {
+	read, write, err := os.Pipe()
+	must.NoError(t, err)
+
+	previous := os.Stdout
+	os.Stdout = write
+
+	pillars, err := New(Options{}).NewPillars(t.Context())
+
+	os.Stdout = previous
+	must.NoError(t, write.Close())
+
+	must.NoError(t, err)
+	must.NotNil(t, pillars)
+	must.NotNil(t, pillars.Logger)
+	must.NotNil(t, pillars.TracerProvider)
+	must.NotNil(t, pillars.MetricsProvider)
+	must.NotNil(t, pillars.Profiler)
+
+	written, err := io.ReadAll(read)
+	must.NoError(t, err)
+	must.NoError(t, read.Close())
+
+	test.Eq(t, "", string(written))
+}
+
+// TestNewPillarsHonorsAConfiguredProvider is the other half: naming a provider
+// has to reach the aggregate constructor, or every telemetry setting the
+// envvars package advertises would be read, validated, and then ignored.
+func TestNewPillarsHonorsAConfiguredProvider(t *testing.T) {
+	t.Parallel()
+
+	cfg := New(Options{})
+	cfg.Observability.Tracing.Provider = tracingcfg.ProviderNoop
+
+	test.True(t, cfg.telemetryConfigured())
+
+	pillars, err := cfg.NewPillars(t.Context())
+	must.NoError(t, err)
+	must.NotNil(t, pillars.TracerProvider)
 }

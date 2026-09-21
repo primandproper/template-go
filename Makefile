@@ -15,7 +15,7 @@ COVERAGE_OUT  := $(ARTIFACTS_DIR)/coverage.out
 TOTAL_PACKAGE_LIST := `go list $(THIS)/...`
 
 # CONTAINER VERSIONS
-LINTER_IMAGE     := golangci/golangci-lint:v2.10.1
+LINTER_IMAGE     := golangci/golangci-lint:v2.13.1
 SHELLCHECK_IMAGE := koalaman/shellcheck:stable
 
 # COMMANDS
@@ -32,8 +32,8 @@ $(ARTIFACTS_DIR):
 ## PREREQUISITES
 
 # setup prepares a fresh clone: creates the artifacts dir and downloads the
-# module cache. This template does not vendor (platform-go's dependency tree is
-# large); builds and tests run against the module cache.
+# module cache. This template does not vendor (primitives-go's dependency tree
+# is large); builds and tests run against the module cache.
 .PHONY: setup
 setup: $(ARTIFACTS_DIR)
 	go mod download
@@ -103,6 +103,18 @@ lint: golang_lint shellcheck
 .PHONY: configs
 configs:
 	$(SCRIPTS_DIR)/configs.sh $(THIS)
+
+# envvars regenerates the Go constants for every environment variable that can
+# override the configuration, derived from the `env:` tags reachable from
+# internal/config's configurations constraint. Commit the output; CI fails a PR
+# that renames a config field without regenerating.
+.PHONY: envvars
+envvars:
+	$(SCRIPTS_DIR)/envvars.sh $(THIS)
+
+# generated regenerates everything under GENERATED FILES.
+.PHONY: generated
+generated: configs envvars
 
 ## EXECUTION
 
